@@ -1,3 +1,6 @@
 aiogram==3.13.1
 pydantic-settings==2.5.2
 surrogates==1.0.2
+asyncpg==0.30.0
+alembic==1.14.0
+sqlalchemy[asyncio]==2.0.36

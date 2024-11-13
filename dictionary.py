@@ -10,7 +10,6 @@ texts = {
         "count_media": "Добавлен${letter} ${count} из 10 медиафайлов",
         "intro": "Привет! Я - твой помощник с поиском друзей и пары в твоём универе - 'NAME'.",
         "intro2": "Сейчас я задам несколько вопросов о тебе, чтобы мы могли познакомиться поближе.",
-        "about_cancel": "Не забывай, что ты всегда можешь нажать /cancel и забыть о том, что было между нами эти мгновения.",
         "ask_name": "Но раз ты ещё здесь, ответь на простой вопрос: как тебя зовут?", 
         "ask_age": "? Тебе повезло с именем, в отличие от меня...\nА сколько тебе лет?",
         "about_age": "И я ни за что не поверю, что тебе за 60, и очень надеюсь, что ты старше 16-ти", 
@@ -28,7 +27,7 @@ texts = {
         "wrong_introduction": "Ого! Надо было так на ЕГЭ писать, тут хочется более лаконичного что ли...",
         "wrong_media": "Ты по моему отправил что-то не то...",
         "wrong_count": "Сейчас от красоты у кого-то глаза лопнут...\nДавай ограничимся 10ю медиафайлами?",
-        "user_data": "Твоя анкета\nИмя: {}\nВозраст: {}\nПол: {}\nИщу: {}\nО себе: {}"
+        "your_profile": "Твоя анкета\nИмя: {}\nВозраст: {}\nПол: {}\nИщу: {}\nО себе: {}"
     },
     'English': {
         "yes" : "Yes",
@@ -41,7 +40,6 @@ texts = {
         "count_media": "Added ${count} out of 10 media files",
         "intro": "Hi! I'm 'NAME', here to help you find friends and meet someone special in your university!", 
         "intro2": "Now I'm going to ask you a few questions so that we can get to know each other", 
-        "about_cancel": "If you change your mind at any point, feel free to use /cancel to erase all traces of this interaction", 
         "ask_name": "So, what's your name?",
         "ask_age": "? What a beautiful name! Now, how old are you?",
         "about_age": "I sincerely hope you are at least 16 years old, but don't tell me you are 60 or older!", 
@@ -59,6 +57,13 @@ texts = {
         "wrong_introduction": "Wow! That was eloquent, but it's a bit too much",
         "wrong_media": "That doesn't look like a picture or a video.",
         "wrong_count": "I know your beauty deserves an art gallery dedicated to it, but let's limit ourselves to 10 media files, okay?",
-        "user_data": "Your form\nName: {}\nAge: {}\nGender: {}\nLooking for: {}\nAbout: {}"
+        "your_profile": "Your profile\nName: {}\nAge: {}\nGender: {}\nLooking for: {}\nAbout: {}"
     }
+}
+
+icons = {
+    'languages': ["🇷🇺", "🇬🇧"],
+    'genders': ['🙋‍♂️', '🙋‍♀️'],
+    'genders_wf': ['🙋‍♂️', '🙋‍♀️', '🙋‍♂️/🙋‍♀️'],
+    'updates': ["📛", "🎂", "🙋‍♂️/🙋‍♀️", "✍️", "📸", "🌐"]
 }

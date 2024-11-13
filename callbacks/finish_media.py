@@ -1,6 +1,6 @@
 from aiogram.fsm.context import FSMContext
 from aiogram.utils.media_group import MediaGroupBuilder
-from dictionary import texts
+from dictionary import texts, icons
 
 async def finish_media(callback_query, state: FSMContext):
     await callback_query.answer()
@@ -25,4 +25,4 @@ async def finish_media(callback_query, state: FSMContext):
         await callback_query.message.answer_media_group(media=album_builder.build())
     else:
         await callback_query.message.answer(texts[user_data['language']]['wrong_media'])
-    await state.clear()
+    await state.menu()

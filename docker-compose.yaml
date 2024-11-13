@@ -1,0 +1,32 @@
+services:
+  postgres:
+    image: postgres:latest
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_NAME: ${POSTGRES_NAME}
+    networks:
+      - tg_network
+    ports:
+      - ${POSTGRES_PORT}:${POSTGRES_PORT}
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+
+  bot:
+    build: .
+    volumes:
+      - .:/bot
+    restart: always
+    environment:
+      BOT_TOKEN: ${BOT_TOKEN} 
+    networks:
+      - tg_network
+    depends_on: 
+      - postgres
+
+networks:
+  tg_network:
+    driver: bridge
+
+volumes:
+  pg_data:

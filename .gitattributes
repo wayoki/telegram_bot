@@ -1,0 +1,4 @@
+* text=auto
+*.py text eol=lf
+alembic.ini text eol=lf
+alembic/**/*.py text eol=lf
