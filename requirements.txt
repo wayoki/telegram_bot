@@ -4,3 +4,4 @@ surrogates==1.0.2
 asyncpg==0.30.0
 alembic==1.14.0
 sqlalchemy[asyncio]==2.0.36
+boto3==1.35.85

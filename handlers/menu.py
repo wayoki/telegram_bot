@@ -1,7 +1,7 @@
 from aiogram import Router
 from aiogram.types import Message, ReplyKeyboardRemove, InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery
 from aiogram.fsm.context import FSMContext
-from database import show_user_data, update_user_data, delete_user_data, get_user_data, save_user_data
+from database import show_user_data, update_user_data, delete_user_data, get_user_data
 from keyboards.simple_row import make_row_keyboard
 from dictionary import texts, icons
 from handlers.states import info
@@ -20,7 +20,8 @@ async def menu(message: Message, state: FSMContext):
 @router.message(info.nav)
 async def navigation(message: Message, state: FSMContext):
     if message.text == "💖🔎":
-        pass
+        from handlers.search import cmd_search
+        await cmd_search(message, state)
     elif message.text == "👤":
         await message.answer(
             text="Navigation:\n1. Show my profile\n2. Change something\n3. Recreate profile\n4. Delete profile",
@@ -35,7 +36,7 @@ async def navigation(message: Message, state: FSMContext):
 @router.message(info.setting)
 async def profile_setting(message: Message, state: FSMContext):
     if message.text == "👤🖼":
-        user_info = await show_user_data({"user_id": message.from_user.id})
+        user_info = await show_user_data({'user_id': message.from_user.id})
         await message.answer(user_info)
         await state.set_state(info.menu)
         await menu(message, state)

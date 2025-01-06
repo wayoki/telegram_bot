@@ -15,3 +15,6 @@ class info(StatesGroup):
     setting = State()
     update = State()
     waiting_for_new_value = State()
+    search = State()
+    choice = State()
+    message = State()

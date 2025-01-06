@@ -8,6 +8,9 @@ class Settings(BaseSettings):
     POSTGRES_HOST: str
     POSTGRES_PORT: str
     POSTGRES_NAME: str
+    S3_ACCESS_KEY: str
+    S3_SECRET_KEY: str
+    BUCKET_NAME: str
 
     @property
     def database_url_asyncpg(self):

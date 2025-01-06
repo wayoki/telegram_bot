@@ -3,7 +3,7 @@ import logging
 from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
 from config_reader import config
-from handlers import create, menu, start
+from handlers import create, menu, start, search
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -15,6 +15,7 @@ async def main():
     dp.include_router(start.router)
     dp.include_router(create.router)
     dp.include_router(menu.router)
+    dp.include_router(search.router)
     await dp.start_polling(bot)
 
 if __name__ == "__main__":

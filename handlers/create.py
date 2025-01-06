@@ -1,10 +1,9 @@
 from aiogram import Router, F
 from aiogram.fsm.context import FSMContext
 from keyboards.simple_row import make_row_keyboard
-from aiogram.types import Message, ReplyKeyboardRemove, ContentType, InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery
+from aiogram.types import Message, ReplyKeyboardRemove, ContentType, InlineKeyboardButton, InlineKeyboardMarkup
 from dictionary import texts, icons
-from callbacks.finish_media import finish_media
-from database import save_user_data, get_user_data, show_user_data
+from database import save_user_data, get_user_data, upload_media
 from handlers.states import info
 
 router = Router()
@@ -139,51 +138,57 @@ async def introduction_chosen(message: Message, state: FSMContext):
         user_data['introduction'] = message.text
         await save_user_data(user_data)
         await get_user_data(user_data.get('user_id'))
-        await message.answer(await show_user_data(user_data))
-        await state.set_state(info.menu)
-        from handlers.menu import menu
-        await menu(message, state)
+        await message.answer(texts[user_data['language']]['ask_media'])
+        await message.answer(texts[user_data['language']]['about_media'])
+        await state.set_state(info.media)
     else:
         await message.answer(
             text=texts[user_data['language']]['wrong_introduction'],
             reply_markup=ReplyKeyboardRemove()
         )
 
-# @router.message(info.media, F.photo | F.video | F.text)
-# async def media_chosen(message: Message, state: FSMContext):
-#     user_data = await state.get_data()
-#     media_list = user_data.get('media_list', [])
-#     count = user_data.get('count', 0)
-#     if count >= 10:
-#         await message.answer(texts[user_data['language']]['wrong_count'])
-#         return
-#     match message.content_type:
-#         case ContentType.VIDEO:
-#             media_id = message.video.file_id
-#             media_list.append(('video', media_id))
-#             count += 1
-#         case ContentType.PHOTO:
-#             media_id = message.photo[-1].file_id
-#             media_list.append(('photo', media_id))
-#             count += 1
-#         case _:
-#             await message.answer(texts[user_data['language']]['wrong_media'])
-#             return
-#     await state.update_data(media_list = media_list, count=count)
-#     if user_data['language'] == 'Русский':
-#         letter = "" if count == 1 else "о"
-#         count_message = texts[user_data['language']]['count_media'].replace('${count}', str(count)).replace('${letter}', letter)
-#     if user_data['language'] == 'English':
-#         count_message = texts[user_data['language']]['count_media'].replace('${count}', str(count))
-#     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-#         [InlineKeyboardButton(text=texts[user_data['language']]['finish'], callback_data="finish_photos")]
-#     ])
-#     await message.answer(count_message, reply_markup=keyboard)
-    
+@router.message(info.media, F.photo | F.video | F.text)
+async def media_chosen(message: Message, state: FSMContext):
+    user_data = await state.get_data()
+    count = user_data.get('count', 0)
+    media_list = user_data.get('media_list', [])
+    if count >= 10:
+        await message.answer(texts[user_data['language']]['wrong_count'])
+        return
+    match message.content_type:
+        case ContentType.VIDEO:
+            count += 1
+            media_id = message.video.file_id
+            media_type = "video"
+        case ContentType.PHOTO:
+            count += 1
+            media_id = message.photo[-1].file_id
+            media_type = "photo"
+        case _:
+            await message.answer(texts[user_data['language']]['wrong_media'])
+            return
+    media_list.append((media_type, media_id))
+    await state.update_data(count=count, media_list=media_list)
+    file_from_tg = await message.bot.get_file(media_id)
+    file_name = f"{count}"
+    await upload_media(message.bot, file_from_tg.file_path, file_name, user_data['user_id'], media_type)
+    if user_data['language'] == 'Русский':
+        letter = "" if count == 1 else "о"
+        count_message = texts[user_data['language']]['count_media'].replace('${count}', str(count)).replace('${letter}', letter)
+    else:
+        count_message = texts[user_data['language']]['count_media'].replace('${count}', str(count))
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text=texts[user_data['language']]['finish'], callback_data="finish_media")]
+    ])
+    await message.answer(count_message, reply_markup=keyboard)
 
-# @router.callback_query(lambda cb: cb.data == 'finish_photos')
-# async def handle_finish_photos(callback_query, state: FSMContext):
-#     await finish_media(callback_query, state)
+@router.callback_query(lambda cb: cb.data == 'finish_media')
+async def callback_finish_media(callback_query, state: FSMContext):
+    await callback_query.answer()
+    user_data = await state.get_data()
+    user_id = user_data.get("user_id")
+    from handlers.start import cmd_start
+    await cmd_start(callback_query.message, state, user_id=user_id)
 
 # @router.callback_query(lambda cb: cb.data == 'empty_text')
 # async def empty_text(callback_query: CallbackQuery, state: FSMContext):
