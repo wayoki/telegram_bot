@@ -2,6 +2,7 @@
 <h3><b>Дисклеймер</b></h3>
 <p><i>Сразу хочу сказать, что гайд нацелен на людей, имеющих хотя бы минимальное понимание python, так как я не очень хочу досконально разжёвывать информацию. Плюсом, я не являюсь профессиональным программистом, а скорее разработчиком-самоучкой, который просто хочет сделать то, что хочет. В первую очередь, хочу посоветовать всё же читать гайды более знающих людей (список литературы будет ниже). Мой же использовать как интересную находку или типо того.</i></p>
 <p><i>Так как я не делаю гайд с подробным пояснением всех процессов, я бы посоветовал прибегнуть к такому порядку: пробегаете глазами определенной части гайда (проще брать файлами) -> что осталось непонятным - гуглите или читаете второй гайд (например, из предложенных мной) -> пытаетесь понять мой гайд.</i></p>
+<p><i>Проект, в настоящее время, все ещё находится <b>в разработке</b>. Поэтому readme находится на этапе написания и будет пополняться новой информацией по возможности. Поэтому не стоит "тыкать" меня в то, что какая-то часть не дописана и/или недостаточно объяснена.</i></p>
 <p><i>Мне кажется, здесь главное понять мою философию и взять готовые от меня решения, а не учиться по мне, как по учебнику. Именно поэтому моя лицензия предполагает копирование, но не монетизацию.</i></p>
 <p><i>К этапу разработки я имел небольшой опыт программирования на JavaScript и HTML/CSS, базовое владение Linux, Git и прочее</i></p>
 <p><b><i>Спасибо за внимание!</i></b></p>
@@ -640,9 +641,164 @@ alembic upgrade head # команда для применения миграци
 alembic downgrade # команда для "отката"
 ```
 <p><b>Важный момент:</b> прописывание этих команд должно быть внутри docker-контейнера (еще помните docker exec ...?). И, перед мигрированием, советую залезать в <i>alembic/versions/"имя миграции"</i> для проверки правильности миграции (в случае чего, аккуратного её редактирования).</p>
-<p>Слабо верится, но если вы смогли пройти даже это испытание (лично для меня, alembic стал одной из самых неприятных частей), то вы точно готовы к дальшейшим "ужасам". На данном этапе у вас должна быть программа для просмотра базы данных. В моём случае, это <i>PgAdmin</i>. Мне довольно сложно будет рассказать про них, так как решений достаточно много и я не могу представить, чем вы захотите пользоваться. Но все они настраиваются довольно быстро (так как большая часть проблем возникает на этапе плохого составления docker-образа). И, как вы успели понять, я уже убрал у вас почти весь головняк, чтобы вы со спокойной душой смогли выбрать и настроить программу для базы данных. Не благодарите.</p>
+<p>Слабо верится, но если вы смогли пройти даже это испытание (лично для меня, alembic стал одной из самых неприятных частей), то вы точно готовы к дальшейшим "ужасам". На данном этапе у вас должна быть программа для просмотра базы данных. В моём случае, это <i>PgAdmin</i> (гайд по настройке в Списке литературы). Мне довольно сложно будет рассказать про них, так как решений достаточно много и я не могу представить, чем вы захотите пользоваться. Но все они настраиваются довольно быстро (так как большая часть проблем возникает на этапе плохого составления docker-образа). И, как вы успели понять, я уже убрал у вас почти весь головняк, чтобы вы со спокойной душой смогли выбрать и настроить программу для базы данных. Не благодарите.</p>
 <p>В следующих же главах начнутся реальные нападки в сторону вашей психики (для тех, кто, как я, не был готов к такому опыту, конечно). И "хит-парад" звёзд открывает...</p>
+<h2><b>"Взрослое" программирование: облачное хранилище, boto3 и работа с базой данных</b></h2>
+<p>Возможно, для вас все слова, о которых я написал в заголовке, это просто завтрак. Но, если брать обычного рядового "ученика", то он изредка начинает подход к программированию с этой стороны. Поэтому, как мне кажется, данная часть вызовет основные проблемы у большинства. Мы, наконец, приоткроем занавесу главного босса - <i>database.py</i>, в которой, на данный момент, содержится вся логика работы с базой данных и облачным хранилищем.</p>
+<p>После создания таблицы и её тестирования, я озадачился тем, как сохранять медиафайлы пользователей. Выбор пал на s3-хранилище от Яндекса из-за бесплатного кол-ва памяти, простоты масштабирования и удобного сайта, но вы можете найти ещё множество решений на рынке.</p>
+<p>Объяснять процесс создания хранилища, бакета и получения различных ключей нет смысла, так как он индивидуален у каждой компании. Читайте документацию (для использующих yandexcloud - Список литературы).</p>
+<p><i>Важно упомянуть, что, на данный момент, database.py ещё сильно не дописан.</i></p>
 
+```python
+s3_client = boto3.client( # создаем s3-хранилище, в моём случае, yandexcloud
+    service_name='s3',
+    endpoint_url='https://storage.yandexcloud.net', # указывает url для доступа (чаще всего указан в документации вашей платформы)
+    aws_access_key_id=config.S3_ACCESS_KEY, # хочу обратить внимание на то, что названия двух переменных ниже нельзя менять; здесь нужно указать идентификатор ключа
+    aws_secret_access_key=config.S3_SECRET_KEY, # здесь нужно указать секретный ключ
+)
+
+BUCKET_NAME = config.BUCKET_NAME # название бакета, в котором будет храниться
+
+AsyncSessionLocal = sessionmaker( # создаем "фабрику" сессий, т.е. позволяет создавать новую сессию для каждого вызова 
+    engine, class_=AsyncSession, expire_on_commit=False
+)
+
+async def get_session(): # создаем функцию для запуска сессий
+    async with AsyncSessionLocal() as session:
+        yield session
+```
+<p>Хотелось бы на этом этапе прояснить несколько моментов, так как в дальнейшем мы не будем особо ничего настраивать. <i>Кто такой этот ваш бакет?</i> Если кратко, бакет - контейнер, в котором хранятся данные. <i>Что такое сессия?</i> Объект, помогающий объединить программу и базу данных.</p>
+<p>Сейчас же мы плавно приступаем к работе с базой данных и облачным хранилищем.</p>
+
+ ```python
+async def save_user_data(user_data): # функция для сохранения данных пользователя в базе данных (вы могли видеть её в финальном state в create.py)
+    async for session in get_session(): # получаем сессию
+        query = select(tablename).filter(User.user_id == user_data['user_id']) # создаем sql-запрос для получения данных о пользователе по user_id (сделано с целью предотвращения ошибок)
+        result = await session.execute(query)
+        existing_user = result.scalars().first() # выводим первый попавшийся объект, удовлетворяющий нашему фильтру по user_id (по идее, должен выдать не None)
+        if existing_user: # проверка
+            return "User already exists"
+        new_user = User( # добавление пользователя в таблицу; ниже берем все данные, которые мы сохраняли в user_data в create.py
+            user_id=user_data['user_id'],
+            name=user_data['name'],
+            age=user_data['age'],
+            gender=user_data['gender'],
+            gender_wf=user_data['gender_wf'],
+            introduction=user_data['introduction'],
+            language=user_data['language']
+        )
+        session.add(new_user) # добавляем
+        await session.commit() # коммитим изменения (проще, сохраняем)
+
+async def get_user_data(user_id: int): # получение данных о пользователе, можно заметить, что функция очень похожа на первую часть save_user_data, поэтому, в целом объяснять нечего
+    async for session in get_session():
+        query = select(User).filter(User.user_id == user_id)
+        result = await session.execute(query)
+        user = result.scalars().first()
+        return user
+
+async def show_user_data(user_data): # функция, показывающая пользователю его анкету
+    user = await get_user_data(user_data['user_id']) # ожидаем, когда из базы данных достанется анкета
+    lang_texts = texts.get(user.language, texts['English']) # локализация на разные языки
+    profile = lang_texts["your_profile"].format( # подготовленный шаблон в dictionary.py
+        user.name,
+        user.age,
+        user.gender,
+        user.gender_wf,
+        user.introduction
+    )
+    return profile
+
+async def delete_user_data(user_id: int): # функция, удаляющая пользователя из базы данных
+    async for session in get_session():
+        query = select(User).filter(User.user_id == user_id)
+        result = await session.execute(query)
+        user = result.scalars().first()
+        await session.delete(user) # начало всё так же похоже на первую и 2ю функции (так как мы, по сути, для начала работы с анкетой, должны "вытащить" её из базы данных), но здесь мы используем метод delete для удаления (что ни странно)
+        await session.commit()
+
+async def update_user_data(user_id: int, name: str = None, age: int = None, gender: str = None, gender_wf: str = None, introduction: str = None, language: str = None): # функция, изменяющая какой-либо параметр в анкете по указанию пользователя
+    async for session in get_session():
+        query = select(User).filter(User.user_id == user_id)
+        result = await session.execute(query)
+        user = result.scalars().first()
+        if name: # вроде стандартную процедуру if/else объяснять не нужно, но важно прояснить, что на момент вызова функции, мы уже принимаем на вход новое значение от пользователя и, по сути, просто сохраняем его
+            user.name = name
+        if age is not None:
+            user.age = age
+        if gender:
+            user.gender = gender
+        if gender_wf:
+            user.gender_wf = gender_wf
+        if introduction:
+            user.introduction = introduction
+        if language:
+            user.language = language
+        await session.commit()
+
+async def upload_media(bot, file_path: str, file_name: str, user_id: str, media_type: str): # функция для загрузки медиафайлов из телеграмма в облачное хранилище
+    file = await bot.download_file(file_path) # стандартный способ выгрузки файлов из телеграмма
+    match media_type:
+        case "photo":
+            file_name = f"{file_name}.jpg" # методы нумерации и форматирования я уже объяснял в части create.py
+            content_type = "image/jpeg"
+        case "video":
+            file_name = f"{file_name}.mp4"
+            content_type = "video/mp4"
+        case _:
+            return None
+    file_path = f"users/{user_id}/{file_name}" # мне показалось, самой выигрышной стратегией организации файловой системы это простой users/id пользователя/1.jpg, 2.mp4, ..., 10.jpg. По данному пути легко извлекать данных и не нужно вводить никаких новых переменных
+    s3_client.put_object( # метод для загрузки файлов в облако по указанному пути
+        Bucket=BUCKET_NAME,
+        Key=file_path,
+        Body=file,
+        ContentType=content_type
+    )
+    file_url = f"https://{BUCKET_NAME}.s3.yandexcloud.net/{file_path}" # так выглядит url для загрузки файлов (не путать url и путь файла)
+    return file_url
+
+async def get_next_user(db_session: AsyncSession, user_id: int): # функция для прокрутки пользователей в "Поиске партнеров"
+    result = await db_session.execute(select(User).where(User.user_id == user_id))
+    user = result.scalar_one_or_none()
+    if not user.viewed_users: # проверка на то, что у нашего пользователя есть массив viewed_users
+        user.viewed_users = []
+    result = await db_session.execute(
+        select(User).where( # составляем sql-запрос для извлечения подходящей анкеты, которая
+            User.user_id != user_id, # не является нашим же пользователем
+            ~User.user_id.in_(user.viewed_users) # и не находится в массиве viewed_users
+        ).order_by(func.random()) # и создаем рандомизацию
+    )
+    next_user = result.scalars().first()
+    return next_user
+
+async def add_viewed_user(db_session: AsyncSession, user_id: int, viewed_user_id: int): # функция для добавления просмотренной анкеты в массив viewed_users
+    result = await db_session.execute(select(User).where(User.user_id == user_id))
+    user = result.scalar_one_or_none()
+    if not user:
+        return
+    if not user.viewed_users:
+        user.viewed_users = []
+    if viewed_user_id not in user.viewed_users: # создаем проверку на то, что чужая анкета не находится в viewed_users
+        user.viewed_users.append(viewed_user_id) # добавляем анкету в массив
+        await db_session.commit()
+
+async def liked_user(db_session: AsyncSession, user_id: int, liked_user_id: int): # функция для добавления анкеты в liked_users, работает по аналогии с предыдущей
+    result = await db_session.execute(select(User).where(User.user_id == user_id))
+    user = result.scalar_one_or_none()
+    if not user.liked_users:
+        user.liked_users = []
+    user.liked_users.append(liked_user_id)
+    await db_session.commit()
+```
+<p>На данный момент, это весь функционал бота. Как вы уже могли заметить, пока с медиафайлами бот может проводить только процесс загрузки. Остальные операции оказались гораздно труднее в реализации, поэтому временно их нет.</p>
+<p>Вы, возможно, зададитесь вопросом: "А что тут, собственно говоря, сложного?" Для человека, не имеющего опыта в данной разработке и не имеющего достаточно больших знаний, это оказалось довольно сложным, так как с каждой новой функцией приходится всё больше искать информацию в интернете, что больше походит на процесс гуглинга, а не программирования.</p>
+
+**Ближайшие планы**
+- Добавление действий с медиафайлами
+- Нормальная "прокрутка"
+- Добавление минимальных алгоритмов для поиска
+- Верификация
+<p><b>Примерная дата выхода проекта в свет: май-июнь 2025г.</b></p>
 <h3>Список литературы</h3>
 
 **aiogram**
@@ -657,4 +813,11 @@ alembic downgrade # команда для "отката"
 - https://habr.com/ru/companies/amvera/articles/849836/ - начать можно с главы "Создание базы данных"
 
 **SQLalchemy**
-- 
+- https://habr.com/ru/articles/848592/ - половина информации сосредоточена здесь
+- https://www.youtube.com/watch?v=hYuGRgVXGwU&list=PLeLN0qH0-mCXARD_K-USF2wHctxzEVp40 - хороший мини-курс для более глубокого понимания
+
+**PgAdmin**
+- https://edu.postgrespro.ru/16/dev1-16/pgadmin.pdf - быстрая настройка PgAdmin
+
+**S3 storage**
+- https://yandex.cloud/ru/docs/storage/quickstart - так как я использую в качестве хранилища yandexcloud, то и гайд даю на него
