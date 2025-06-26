@@ -1,7 +1,7 @@
-from aiogram import Router
+from aiogram import Router, Bot
 from aiogram.types import ReplyKeyboardRemove
 from keyboards.simple_row import make_row_keyboard
-from database import get_next_user, get_session, liked_user, add_viewed_user
+from database import get_next_user, get_session, add_liked_user, add_viewed_user, make_match
 from handlers.menu import menu
 from aiogram.types import Message
 from aiogram.fsm.context import FSMContext
@@ -26,14 +26,18 @@ async def cmd_search(message: Message, state: FSMContext):
             await menu(message, state)
 
 @router.message(info.choice)
-async def choose(message: Message, state: FSMContext):
+async def choose(message: Message, state: FSMContext, bot: Bot):
     async for db_session in get_session():
         next_user_id = await state.get_data()
         next_user_id = next_user_id.get("next_user_id")
         user_id = message.from_user.id
-        await add_viewed_user(db_session, user_id, next_user_id)
         if message.text == "❤️":
-            await liked_user(db_session, user_id, next_user_id)
-            await cmd_search(message, state)
-        elif message.text == "💔":
-            await cmd_search(message, state)
+            await add_liked_user(db_session, user_id, next_user_id)
+            match_created = await make_match(db_session, user_id, next_user_id)
+            if match_created:
+                await bot.send_message(chat_id=next_user_id, text="Ура, ты создал мэтч!")
+                await message.answer("Ура, ты создал мэтч!")
+            else:
+                await bot.send_message(chat_id=next_user_id, text="Кто-то отправил лайк")
+        await add_viewed_user(db_session, user_id, next_user_id)
+        await cmd_search(message, state)

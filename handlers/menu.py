@@ -1,7 +1,7 @@
-from aiogram import Router
+from aiogram import Router, Bot
 from aiogram.types import Message, ReplyKeyboardRemove, InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery
 from aiogram.fsm.context import FSMContext
-from database import show_user_data, update_user_data, delete_user_data, get_user_data
+from database import show_user_data, update_user_data, delete_user_data, get_user_data, has_likes, get_session, get_was_liked_users, remove_from_was_liked, add_liked_user, add_viewed_user, make_match
 from keyboards.simple_row import make_row_keyboard
 from dictionary import texts, icons
 from handlers.states import info
@@ -11,14 +11,19 @@ router = Router()
 
 @router.message(info.menu)
 async def menu(message: Message, state: FSMContext):
-    await message.answer(
-        text="Navigation:\n1. Find someone\n2. Profile\n3. Contacts",
-        reply_markup=make_row_keyboard(["💖🔎", "👤", "ℹ"])
-    )
-    await state.set_state(info.nav)
+    async for db_session in get_session():
+        if await has_likes(db_session, user_id=message.from_user.id) == True:
+            was_liked = '📬'
+        else:
+            was_liked = '📪'
+        await message.answer(
+            text="Navigation:\n1. Find someone\n2. Profile\n3. Your likes\n4. Contacts",
+            reply_markup=make_row_keyboard(["💖🔎", "👤", was_liked,"ℹ"])
+        )
+        await state.set_state(info.nav)
 
 @router.message(info.nav)
-async def navigation(message: Message, state: FSMContext):
+async def navigation(message: Message, state: FSMContext, bot: Bot):
     if message.text == "💖🔎":
         from handlers.search import cmd_search
         await cmd_search(message, state)
@@ -28,6 +33,32 @@ async def navigation(message: Message, state: FSMContext):
             reply_markup=make_row_keyboard(["👤🖼", "👤⚙", "👤🔄", "👤🚫"])
         )
         await state.set_state(info.setting)
+    elif message.text == '📬' or message.text == '📪':
+        async for db_session in get_session():
+            user_id = message.from_user.id
+            liked_users = await get_was_liked_users(db_session, user_id)
+            if liked_users:
+                next_user = liked_users.pop(0)
+                await state.update_data(next_user_id=next_user.user_id)
+                await message.answer(
+                    text=f"Name: {next_user.name}\nAge: {next_user.age}\nGender: {next_user.gender}\nBio: {next_user.introduction}",
+                    reply_markup=make_row_keyboard(["❤️", "💔"])
+                )
+                if message.text == "❤️":
+                    await add_liked_user(db_session, user_id, next_user.user_id)
+                    match_created = await make_match(db_session, user_id, next_user.user_id)
+                    if match_created:
+                        await bot.send_message(chat_id=next_user.user_id, text="Ура, ты создал мэтч!")
+                        await message.answer("Ура, ты создал мэтч!")
+                    else:
+                        await bot.send_message(chat_id=next_user.user_id, text="Кто-то отправил лайк!")
+                await state.set_state(info.choice)
+                await add_viewed_user(db_session, user_id, next_user_id=next_user.user_id)
+                await remove_from_was_liked(db_session, user_id, next_user.user_id)
+                await navigation(message, state, bot)
+            else:
+                await message.answer("No more liked users.")
+                await menu(message, state)
     elif message.text == "ℹ":
         await message.answer("My creator: t.me/wayoki")
         await state.set_state(info.menu)
@@ -83,12 +114,10 @@ async def update_data(message: Message, state: FSMContext):
                 reply_markup=make_row_keyboard(icons['genders_wf'])
             )
         case "✍️":
-            # inline_keyboard = InlineKeyboardMarkup(
-            #     inline_keyboard=[
-            #         [InlineKeyboardButton(text=texts[user.language]['empty'], callback_data='empty_text')]
-            #     ]
-            # )
-            await message.answer(texts[user.language]['about_introduction'], reply_markup=ReplyKeyboardRemove())
+            await message.answer(
+                text=texts[user.language]['about_introduction'],
+                reply_markup=ReplyKeyboardRemove()
+            )
         case "🌐":
             await message.answer(
                 text='Choose a new language:', 
@@ -142,7 +171,3 @@ async def save_updated_data(message: Message, state: FSMContext):
                 await state(info.update)
     await message.answer(text="Updated successfully!", reply_markup=ReplyKeyboardRemove())
     await cmd_start(message, state)
-
-# @router.callback_query(lambda cb: cb.data == 'empty_text')
-# async def empty_text(callback_query: CallbackQuery, state: FSMContext) -> bool:
-#     await callback_query.answer()

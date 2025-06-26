@@ -1,9 +1,9 @@
 import boto3
-from sqlalchemy import Column, Integer, String, BigInteger, ARRAY
+from sqlalchemy import Column, Integer, String, BigInteger, ForeignKey, UniqueConstraint
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from sqlalchemy.orm import sessionmaker, declarative_base
+from sqlalchemy.orm import sessionmaker, declarative_base, relationship, selectinload
 from sqlalchemy.future import select
-from sqlalchemy.sql.expression import func
+from sqlalchemy.sql.expression import func, and_
 from config_reader import config
 from dictionary import texts
 
@@ -18,8 +18,72 @@ class User(Base):
     gender_wf = Column(String, nullable=False)
     introduction = Column(String, nullable=True)
     language = Column(String, nullable=False)
-    viewed_users = Column(ARRAY(BigInteger), default=[])
-    liked_users = Column(ARRAY(BigInteger), default=[])
+    views = relationship(
+        "UserView",
+        back_populates="user",
+        foreign_keys="[UserView.user_id]",
+        lazy="selectin"
+    )
+    likes = relationship(
+        "UserLike",
+        back_populates="user",
+        foreign_keys="[UserLike.user_id]",
+        lazy="selectin"
+    )
+    was_liked = relationship(
+        "UserWasLiked",
+        back_populates="user",
+        foreign_keys="[UserWasLiked.user_id]",
+        lazy="selectin"
+    )
+    matches_user_1 = relationship(
+        "UserMatch",
+        back_populates="user_1",
+        foreign_keys="[UserMatch.user_1_id]",
+        lazy="selectin"
+    )
+    matches_user_2 = relationship(
+        "UserMatch",
+        back_populates="user_2",
+        foreign_keys="[UserMatch.user_2_id]",
+        lazy="selectin"
+    )
+
+class UserView(Base):
+    __tablename__ = 'user_views'
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    user_id = Column(BigInteger, ForeignKey('users.user_id', ondelete='CASCADE'), nullable=False)
+    viewed_user_id = Column(BigInteger, ForeignKey('users.user_id', ondelete='CASCADE'), nullable=False)
+    user = relationship("User", back_populates="views", foreign_keys=[user_id])
+    viewed_user = relationship("User", foreign_keys=[viewed_user_id])
+    __table_args__ = (UniqueConstraint('user_id', 'viewed_user_id', name='_user_view_uc'),)
+
+class UserLike(Base):
+    __tablename__ = 'user_likes'
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    user_id = Column(BigInteger, ForeignKey('users.user_id', ondelete='CASCADE'), nullable=False)
+    liked_user_id = Column(BigInteger, ForeignKey('users.user_id', ondelete='CASCADE'), nullable=False)
+    user = relationship("User", back_populates="likes", foreign_keys=[user_id])
+    liked_user = relationship("User", foreign_keys=[liked_user_id])
+    __table_args__ = (UniqueConstraint('user_id', 'liked_user_id', name='_user_like_uc'),)
+
+class UserWasLiked(Base):
+    __tablename__ = 'was_liked'
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    user_id = Column(BigInteger, ForeignKey('users.user_id', ondelete='CASCADE'), nullable=False)
+    liked_user_id = Column(BigInteger, ForeignKey('users.user_id', ondelete='CASCADE'), nullable=False)
+    user = relationship("User", foreign_keys=[user_id], lazy="selectin")
+    liked_user = relationship("User", foreign_keys=[liked_user_id], lazy="selectin")
+    __table_args__ = (UniqueConstraint('user_id', 'liked_user_id', name='_was_liked_uc'),)
+
+class UserMatch(Base):
+    __tablename__ = 'user_matches'
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    user_1_id = Column(BigInteger, ForeignKey('users.user_id', ondelete='CASCADE'), nullable=False)
+    user_2_id = Column(BigInteger, ForeignKey('users.user_id', ondelete='CASCADE'), nullable=False)
+    user_1 = relationship("User", foreign_keys=[user_1_id])
+    user_2 = relationship("User", foreign_keys=[user_2_id])
+    __table_args__ = (UniqueConstraint('user_1_id', 'user_2_id', name='_user_match_uc'),)
 
 s3_client = boto3.client(
     service_name='s3',
@@ -130,32 +194,83 @@ async def upload_media(bot, file_path: str, file_name: str, user_id: str, media_
 async def get_next_user(db_session: AsyncSession, user_id: int):
     result = await db_session.execute(select(User).where(User.user_id == user_id))
     user = result.scalar_one_or_none()
-    if not user.viewed_users:
-        user.viewed_users = []
+    if not user:
+        return None
     result = await db_session.execute(
-        select(User).where(
-            User.user_id != user_id,
-            ~User.user_id.in_(user.viewed_users)
-        ).order_by(func.random())
+        select(User)
+        .options(selectinload(User.views))
+        .where(
+            and_(
+                User.user_id != user_id,
+                ~User.user_id.in_(select(UserView.viewed_user_id).where(UserView.user_id == user_id))
+            )
+        )
+        .order_by(func.random())
     )
     next_user = result.scalars().first()
     return next_user
 
 async def add_viewed_user(db_session: AsyncSession, user_id: int, viewed_user_id: int):
-    result = await db_session.execute(select(User).where(User.user_id == user_id))
-    user = result.scalar_one_or_none()
-    if not user:
-        return
-    if not user.viewed_users:
-        user.viewed_users = []
-    if viewed_user_id not in user.viewed_users:
-        user.viewed_users.append(viewed_user_id)
+    existing_view = await db_session.execute(
+        select(UserView).filter_by(user_id=user_id, viewed_user_id=viewed_user_id)
+    )
+    existing_view = existing_view.scalar_one_or_none()
+    if not existing_view:
+        viewed_user = UserView(user_id=user_id, viewed_user_id=viewed_user_id)
+        db_session.add(viewed_user)
         await db_session.commit()
 
-async def liked_user(db_session: AsyncSession, user_id: int, liked_user_id: int):
-    result = await db_session.execute(select(User).where(User.user_id == user_id))
-    user = result.scalar_one_or_none()
-    if not user.liked_users:
-        user.liked_users = []
-    user.liked_users.append(liked_user_id)
-    await db_session.commit()
+async def add_liked_user(db_session: AsyncSession, user_id: int, liked_user_id: int):
+    existing_like = await db_session.execute(
+        select(UserLike).filter_by(user_id=user_id, liked_user_id=liked_user_id)
+    )
+    existing_like = existing_like.scalar_one_or_none()
+    if not existing_like:
+        like = UserLike(user_id=user_id, liked_user_id=liked_user_id)
+        db_session.add(like)
+        was_liked = UserWasLiked(user_id=liked_user_id, liked_user_id=user_id)
+        db_session.add(was_liked)
+        await db_session.commit()
+        liked_user = await db_session.execute(select(User).where(User.user_id == liked_user_id))
+        liked_user = liked_user.scalar_one_or_none()
+        return liked_user
+
+async def has_likes(db_session: AsyncSession, user_id: int) -> bool:
+    result = await db_session.execute(select(UserWasLiked).filter(UserWasLiked.user_id == user_id))
+    rows = result.scalars().all()
+    return len(rows) > 0
+
+async def get_was_liked_users(db_session: AsyncSession, user_id: int):
+    result = await db_session.execute(
+        select(User)
+        .join(UserWasLiked, UserWasLiked.liked_user_id == User.user_id)
+        .filter(UserWasLiked.user_id == user_id)
+        .order_by(UserWasLiked.id)
+    )
+    liked_users = result.scalars().all()
+    return liked_users
+
+async def remove_from_was_liked(db_session: AsyncSession, user_id: int, liked_user_id: int):
+    result = await db_session.execute(
+        select(UserWasLiked).filter_by(user_id=user_id, liked_user_id=liked_user_id)
+    )
+    user_liked = result.scalar_one_or_none()
+    if user_liked:
+        await db_session.delete(user_liked)
+        await db_session.commit()
+
+async def make_match(db_session: AsyncSession, user_id: int, liked_user_id: int):
+    user_like_exists = await db_session.execute(
+        select(UserLike).filter_by(user_id=user_id, liked_user_id=liked_user_id)
+    )
+    user_like = user_like_exists.scalar_one_or_none()
+    liked_user_like_exists = await db_session.execute(
+        select(UserLike).filter_by(user_id=liked_user_id, liked_user_id=user_id)
+    )
+    liked_user_like = liked_user_like_exists.scalar_one_or_none()
+    if user_like and liked_user_like:
+        match = UserMatch(user_1_id=user_id, user_2_id=liked_user_id)
+        db_session.add(match)
+        await db_session.commit()
+        return True 
+    return False

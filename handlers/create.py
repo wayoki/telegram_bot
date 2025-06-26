@@ -112,17 +112,10 @@ async def gender_wanna_find_chosen(message: Message, state: FSMContext):
             text=texts[user_data['language']]['ask_introduction'],
             reply_markup=ReplyKeyboardRemove()
         )
-        # inline_keyboard = InlineKeyboardMarkup(
-        #     inline_keyboard=[
-        #     [
-        #     InlineKeyboardButton(
-        #     text=texts[user_data['language']]['empty'],
-        #     callback_data='empty_text'
-        #     )
-        #     ]
-        #     ]
-        # )
-        await message.answer(texts[user_data['language']]['about_introduction'], reply_markup=ReplyKeyboardRemove())
+        await message.answer(
+            text=texts[user_data['language']]['about_introduction'], 
+            reply_markup=ReplyKeyboardRemove()
+        )
         await state.set_state(info.introduction)
     else:
         await message.answer(
@@ -189,13 +182,3 @@ async def callback_finish_media(callback_query, state: FSMContext):
     user_id = user_data.get("user_id")
     from handlers.start import cmd_start
     await cmd_start(callback_query.message, state, user_id=user_id)
-
-# @router.callback_query(lambda cb: cb.data == 'empty_text')
-# async def empty_text(callback_query: CallbackQuery, state: FSMContext):
-#     await callback_query.answer()
-#     user_data = await state.get_data()
-#     user_data.setdefault('introduction', '')
-#     await state.update_data(user_data)
-#     await save_user_data(user_data)
-#     from handlers.start import cmd_start
-#     await cmd_start(callback_query.message, state)
