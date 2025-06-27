@@ -60,7 +60,7 @@ async def navigation(message: Message, state: FSMContext, bot: Bot):
                 await message.answer("No more liked users.")
                 await menu(message, state)
     elif message.text == "ℹ":
-        await message.answer("My creator: t.me/wayoki")
+        await message.answer("My creator: t.me/whywayoki")
         await state.set_state(info.menu)
         await menu(message, state)
 

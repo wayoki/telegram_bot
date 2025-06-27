@@ -3,7 +3,7 @@ from aiogram.fsm.context import FSMContext
 from keyboards.simple_row import make_row_keyboard
 from aiogram.types import Message, ReplyKeyboardRemove, ContentType, InlineKeyboardButton, InlineKeyboardMarkup
 from dictionary import texts, icons
-from database import save_user_data, get_user_data, upload_media
+from database import save_user_data, get_user_data, upload_media, get_session
 from handlers.states import info
 
 router = Router()
@@ -164,13 +164,14 @@ async def media_chosen(message: Message, state: FSMContext):
     await state.update_data(count=count, media_list=media_list)
     file_from_tg = await message.bot.get_file(media_id)
     file_name = f"{count}"
-    await upload_media(message.bot, file_from_tg.file_path, file_name, user_data['user_id'], media_type)
+    async for session in get_session():
+        await upload_media(message.bot, file_from_tg.file_path, file_name, user_data['user_id'], media_type, session)
     if user_data['language'] == 'Русский':
         letter = "" if count == 1 else "о"
         count_message = texts[user_data['language']]['count_media'].replace('${count}', str(count)).replace('${letter}', letter)
     else:
         count_message = texts[user_data['language']]['count_media'].replace('${count}', str(count))
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[ 
         [InlineKeyboardButton(text=texts[user_data['language']]['finish'], callback_data="finish_media")]
     ])
     await message.answer(count_message, reply_markup=keyboard)

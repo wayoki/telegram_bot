@@ -1,11 +1,12 @@
 import boto3
-from sqlalchemy import Column, Integer, String, BigInteger, ForeignKey, UniqueConstraint
+from sqlalchemy import Column, Integer, String, BigInteger, ForeignKey, UniqueConstraint, delete, update
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker, declarative_base, relationship, selectinload
 from sqlalchemy.future import select
 from sqlalchemy.sql.expression import func, and_
 from config_reader import config
 from dictionary import texts
+from typing import List
 
 Base = declarative_base()
 
@@ -48,6 +49,11 @@ class User(Base):
         foreign_keys="[UserMatch.user_2_id]",
         lazy="selectin"
     )
+    photos = relationship(
+        "UserPhoto", 
+        back_populates="user", 
+        lazy="selectin"
+    )
 
 class UserView(Base):
     __tablename__ = 'user_views'
@@ -84,6 +90,15 @@ class UserMatch(Base):
     user_1 = relationship("User", foreign_keys=[user_1_id])
     user_2 = relationship("User", foreign_keys=[user_2_id])
     __table_args__ = (UniqueConstraint('user_1_id', 'user_2_id', name='_user_match_uc'),)
+
+class UserPhoto(Base):
+    __tablename__ = 'user_photos'
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    user_id = Column(BigInteger, ForeignKey('users.user_id', ondelete='CASCADE'), nullable=False)
+    file_url = Column(String, nullable=False)
+    file_name = Column(String, nullable=False)
+    media_type = Column(String, nullable=False)
+    user = relationship("User", back_populates="photos")
 
 s3_client = boto3.client(
     service_name='s3',
@@ -130,6 +145,15 @@ async def get_user_data(user_id: int):
         result = await session.execute(query)
         user = result.scalars().first()
         return user
+    # query = (
+    #     select(User)
+    #     .options(selectinload(User.photos))
+    #     .filter(User.user_id == user_id)
+    # )
+    # result = await session.execute(query)
+    # user = result.scalars().first()
+    # return user
+
 
 async def show_user_data(user_data):
     user = await get_user_data(user_data['user_id'])
@@ -141,15 +165,66 @@ async def show_user_data(user_data):
         user.gender_wf,
         user.introduction
     )
+    # media_group = []
+    # for photo in user.photos:
+    #     if photo.media_type == "photo":
+    #         media_group.append(InputMediaPhoto(media=photo.file_url))
+    #     elif photo.media_type == "video":
+    #         media_group.append(InputMediaVideo(media=photo.file_url))
     return profile
+
+async def upload_media(bot, file_path: str, file_name: str, user_id: int, media_type: str, db_session: AsyncSession):
+    file = await bot.download_file(file_path)
+    match media_type:
+        case "photo":
+            file_name = f"{file_name}.jpg"
+            content_type = "image/jpeg"
+        case "video":
+            file_name = f"{file_name}.mp4"
+            content_type = "video/mp4"
+        case _:
+            return None
+    file_path = f"users/{user_id}/{file_name}"
+    s3_client.put_object(
+        Bucket=BUCKET_NAME,
+        Key=file_path,
+        Body=file,
+        ContentType=content_type
+    )
+    file_url = f"https://{BUCKET_NAME}.s3.yandexcloud.net/{file_path}"
+    new_photo = UserPhoto(
+        user_id=user_id,
+        file_url=file_url,
+        file_name=file_name,
+        media_type=media_type
+    )
+    db_session.add(new_photo)
+    await db_session.commit()
+    return file_url
 
 async def delete_user_data(user_id: int):
     async for session in get_session():
         query = select(User).filter(User.user_id == user_id)
         result = await session.execute(query)
         user = result.scalars().first()
-        await session.delete(user)
-        await session.commit()
+        if user:
+            await session.execute(
+                delete(UserMatch).filter((UserMatch.user_1_id == user_id) | (UserMatch.user_2_id == user_id))
+            )
+            await session.execute(
+                delete(UserView).filter((UserView.user_id == user_id) | (UserView.viewed_user_id == user_id))
+            )
+            await session.execute(
+                delete(UserLike).filter((UserLike.user_id == user_id) | (UserLike.liked_user_id == user_id))
+            )
+            await session.execute(
+                delete(UserWasLiked).filter((UserWasLiked.user_id == user_id) | (UserWasLiked.liked_user_id == user_id))
+            )
+            await session.execute(
+                delete(UserPhoto).filter(UserPhoto.user_id == user_id)
+            )
+            await session.delete(user)
+            await session.commit()
 
 async def update_user_data(user_id: int, name: str = None, age: int = None, gender: str = None, gender_wf: str = None, introduction: str = None, language: str = None):
     async for session in get_session():
@@ -169,27 +244,6 @@ async def update_user_data(user_id: int, name: str = None, age: int = None, gend
         if language:
             user.language = language
         await session.commit()
-
-async def upload_media(bot, file_path: str, file_name: str, user_id: str, media_type: str):
-    file = await bot.download_file(file_path)
-    match media_type:
-        case "photo":
-            file_name = f"{file_name}.jpg"
-            content_type = "image/jpeg"
-        case "video":
-            file_name = f"{file_name}.mp4"
-            content_type = "video/mp4"
-        case _:
-            return None
-    file_path = f"users/{user_id}/{file_name}"
-    s3_client.put_object(
-        Bucket=BUCKET_NAME,
-        Key=file_path,
-        Body=file,
-        ContentType=content_type
-    )
-    file_url = f"https://{BUCKET_NAME}.s3.yandexcloud.net/{file_path}"
-    return file_url
 
 async def get_next_user(db_session: AsyncSession, user_id: int):
     result = await db_session.execute(select(User).where(User.user_id == user_id))

@@ -5,6 +5,17 @@ from aiogram.fsm.context import FSMContext
 from database import get_user_data, show_user_data
 from handlers.states import info
 
+# async def send_media_group_to_user(bot, user_id, profile_text, media_files):
+#     media_group = []
+#     for media in media_files:
+#         if media['media_type'] == "photo":
+#             media_group.append(InputMediaPhoto(media=media['url']))
+#         elif media['media_type'] == "video":
+#             media_group.append(InputMediaVideo(media=media['url']))
+#     if media_group:
+#         await bot.send_media_group(chat_id=user_id, media=media_group)
+#     await bot.send_message(chat_id=user_id, text=profile_text)
+
 router = Router()
 
 @router.message(Command("start"))
